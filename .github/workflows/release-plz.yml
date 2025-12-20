@@ -47,8 +47,44 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run release-plz (release)
+        id: release-plz
         uses: release-plz/action@v0.5
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and upload binaries to GitHub Release
+        if: steps.release-plz.outputs.releases_created == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(echo '${{ steps.release-plz.outputs.releases }}' | jq -r '.[0].tag')
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+          cargo test --all
+          cargo build --release
+
+          mkdir -p dist
+          cp target/release/rust_proxy dist/
+          if command -v strip >/dev/null 2>&1; then
+            strip dist/rust_proxy || true
+          fi
+          cp README.md dist/ || true
+          cp deploy/rust-proxy.service dist/ || true
+
+          (cd dist && tar -czf ../rust_proxy-linux-x86_64.tar.gz .)
+          sha256sum rust_proxy-linux-x86_64.tar.gz > rust_proxy-linux-x86_64.tar.gz.sha256
+          sha256sum dist/rust_proxy > rust_proxy-linux-x86_64.sha256
+
+      - name: Upload assets to GitHub Release
+        if: steps.release-plz.outputs.releases_created == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          fail_on_unmatched_files: true
+          files: |
+            rust_proxy-linux-x86_64.tar.gz
+            rust_proxy-linux-x86_64.tar.gz.sha256
+            dist/rust_proxy
+            rust_proxy-linux-x86_64.sha256
