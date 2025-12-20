@@ -97,7 +97,8 @@ async fn stream(
         return Err((StatusCode::BAD_REQUEST, "URL is too long".into()));
     }
 
-    let target = Url::parse(&q.url).map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid URL: {e}")))?;
+    let target =
+        Url::parse(&q.url).map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid URL: {e}")))?;
     match target.scheme() {
         "http" | "https" => {}
         _ => return Err((StatusCode::BAD_REQUEST, "Invalid URL".into())),
@@ -130,7 +131,9 @@ async fn stream(
     if let Ok(origin) = target.origin().ascii_serialization().parse::<HeaderValue>() {
         headers.insert(hyper::header::ORIGIN, origin);
     }
-    if let Ok(referer) = format!("{}/", target.origin().ascii_serialization()).parse::<HeaderValue>() {
+    if let Ok(referer) =
+        format!("{}/", target.origin().ascii_serialization()).parse::<HeaderValue>()
+    {
         headers.insert(hyper::header::REFERER, referer);
     }
 
@@ -140,17 +143,25 @@ async fn stream(
         }
     }
 
-    let mut upstream_resp = fetch_with_timeout(&state, req.method().clone(), target_uri.clone(), headers.clone(), 15)
-        .await?;
+    let mut upstream_resp = fetch_with_timeout(
+        &state,
+        req.method().clone(),
+        target_uri.clone(),
+        headers.clone(),
+        15,
+    )
+    .await?;
 
     if upstream_resp.status() == StatusCode::FORBIDDEN {
         debug!(target = %target, "403 with Referer/Origin, retrying without them");
         headers.remove(hyper::header::REFERER);
         headers.remove(hyper::header::ORIGIN);
-        upstream_resp = fetch_with_timeout(&state, req.method().clone(), target_uri, headers, 10).await?;
+        upstream_resp =
+            fetch_with_timeout(&state, req.method().clone(), target_uri, headers, 10).await?;
     }
 
-    if !upstream_resp.status().is_success() && upstream_resp.status() != StatusCode::PARTIAL_CONTENT {
+    if !upstream_resp.status().is_success() && upstream_resp.status() != StatusCode::PARTIAL_CONTENT
+    {
         return Err((
             StatusCode::BAD_GATEWAY,
             format!("upstream error: {}", upstream_resp.status()),
@@ -181,8 +192,12 @@ async fn stream(
         } else {
             "/stream"
         };
-        let rewritten = rewrite_m3u8(&text, &q.url, &proxy_origin, proxy_path)
-            .map_err(|e| (StatusCode::BAD_GATEWAY, format!("failed to rewrite m3u8: {e}")))?;
+        let rewritten = rewrite_m3u8(&text, &q.url, &proxy_origin, proxy_path).map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("failed to rewrite m3u8: {e}"),
+            )
+        })?;
 
         let mut resp = Response::builder()
             .status(StatusCode::OK)
@@ -230,7 +245,10 @@ async fn fetch_with_timeout(
         Ok(Ok(resp)) => Ok(resp),
         Ok(Err(e)) => {
             warn!(error = %e, "upstream request failed");
-            Err((StatusCode::BAD_GATEWAY, format!("upstream request failed: {e}")))
+            Err((
+                StatusCode::BAD_GATEWAY,
+                format!("upstream request failed: {e}"),
+            ))
         }
         Err(_) => Err((StatusCode::GATEWAY_TIMEOUT, "源服务器响应超时".into())),
     }
@@ -290,7 +308,12 @@ fn apply_cache_policy(headers: &mut HeaderMap, url_lower: &str) {
     }
 }
 
-fn rewrite_m3u8(content: &str, base_url: &str, proxy_origin: &str, proxy_path: &str) -> anyhow::Result<String> {
+fn rewrite_m3u8(
+    content: &str,
+    base_url: &str,
+    proxy_origin: &str,
+    proxy_path: &str,
+) -> anyhow::Result<String> {
     let base = Url::parse(base_url)?;
     let mut out = Vec::new();
 
