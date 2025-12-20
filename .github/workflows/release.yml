@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,6 +23,9 @@ jobs:
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Test
+        run: cargo test --all
+
       - name: Build (release)
         run: cargo build --release
 
@@ -37,9 +41,16 @@ jobs:
           cp README.md dist/ || true
           cp deploy/rust-proxy.service dist/ || true
           (cd dist && tar -czf ../rust_proxy-linux-x86_64.tar.gz .)
+          sha256sum rust_proxy-linux-x86_64.tar.gz > rust_proxy-linux-x86_64.tar.gz.sha256
+          sha256sum dist/rust_proxy > rust_proxy-linux-x86_64.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             rust_proxy-linux-x86_64.tar.gz
+            rust_proxy-linux-x86_64.tar.gz.sha256
+            dist/rust_proxy
+            rust_proxy-linux-x86_64.sha256
