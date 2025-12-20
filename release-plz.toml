@@ -1,0 +1,5 @@
+[workspace]
+# 我们只需要 GitHub Release + tag + 版本号更新，不发布到 crates.io
+publish = false
+# 只在合并 release-plz PR 后才真正执行 release（避免每次 push 都发版）
+release_always = false
