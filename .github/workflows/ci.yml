@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format (rustfmt)
+        run: cargo fmt --all -- --check
+
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test --all
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Upload linux binary (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-ubuntu-x86_64
+          path: target/release/rust_proxy
+          if-no-files-found: error

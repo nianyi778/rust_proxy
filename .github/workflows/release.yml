@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Prepare dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp target/release/rust_proxy dist/
+          if command -v strip >/dev/null 2>&1; then
+            strip dist/rust_proxy || true
+          fi
+          cp README.md dist/ || true
+          cp deploy/rust-proxy.service dist/ || true
+          (cd dist && tar -czf ../rust_proxy-linux-x86_64.tar.gz .)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            rust_proxy-linux-x86_64.tar.gz
