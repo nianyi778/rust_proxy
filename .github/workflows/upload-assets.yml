@@ -1,0 +1,74 @@
+name: upload-assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag / release tag to upload assets to (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure release exists
+        env:
+          TAG: ${{ inputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}"
+          echo "Checking release exists: $api_url"
+          curl -sSfL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$api_url" >/dev/null
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test --all
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Prepare dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp target/release/rust_proxy dist/
+          if command -v strip >/dev/null 2>&1; then
+            strip dist/rust_proxy || true
+          fi
+          cp README.md dist/ || true
+          cp deploy/rust-proxy.service dist/ || true
+          (cd dist && tar -czf ../rust_proxy-linux-x86_64.tar.gz .)
+          sha256sum rust_proxy-linux-x86_64.tar.gz > rust_proxy-linux-x86_64.tar.gz.sha256
+          sha256sum dist/rust_proxy > rust_proxy-linux-x86_64.sha256
+
+      - name: Upload assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          fail_on_unmatched_files: true
+          files: |
+            rust_proxy-linux-x86_64.tar.gz
+            rust_proxy-linux-x86_64.tar.gz.sha256
+            dist/rust_proxy
+            rust_proxy-linux-x86_64.sha256
