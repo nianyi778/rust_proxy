@@ -25,6 +25,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
 
       - name: Run release-plz (release-pr)
         uses: release-plz/action@v0.5
@@ -62,11 +64,13 @@ jobs:
           tag=$(echo '${{ steps.release-plz.outputs.releases }}' | jq -r '.[0].tag')
           echo "TAG=$tag" >> "$GITHUB_ENV"
 
+          sudo apt-get update && sudo apt-get install -y musl-tools
+
           cargo test --all
-          cargo build --release
+          cargo build --release --target x86_64-unknown-linux-musl
 
           mkdir -p dist
-          cp target/release/rust_proxy dist/
+          cp target/x86_64-unknown-linux-musl/release/rust_proxy dist/
           if command -v strip >/dev/null 2>&1; then
             strip dist/rust_proxy || true
           fi

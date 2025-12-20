@@ -37,6 +37,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
 
       - name: Cargo cache
         uses: Swatinem/rust-cache@v2
@@ -44,15 +46,18 @@ jobs:
       - name: Test
         run: cargo test --all
 
-      - name: Build (release)
-        run: cargo build --release
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build (release, musl)
+        run: cargo build --release --target x86_64-unknown-linux-musl
 
       - name: Prepare dist
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp target/release/rust_proxy dist/
+          cp target/x86_64-unknown-linux-musl/release/rust_proxy dist/
           if command -v strip >/dev/null 2>&1; then
             strip dist/rust_proxy || true
           fi
