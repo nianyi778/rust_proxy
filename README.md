@@ -127,3 +127,11 @@ location /api/proxy/stream {
 ## 安全提示
 
 这是“动态上游代理”，天然具备开放代理（Open Proxy）风险：任何人只要能访问你的接口，就可能拿它去请求任意上游 URL。生产环境务必用网关/鉴权/白名单等做限制（本项目当前按你的要求：不做白名单）。
+
+## CI/CD（自动构建与发版）
+
+- CI 会在每次 push/PR 时跑 `fmt/clippy/test/build`。
+- CD 使用 release-plz 自动生成 Release PR、合并后自动打版本并创建 GitHub Release。
+- Release 附件会提供 Linux 可执行文件（musl 静态，避免 glibc 版本不兼容）。
+
+详细说明见 [docs/cicd.md](docs/cicd.md)。
