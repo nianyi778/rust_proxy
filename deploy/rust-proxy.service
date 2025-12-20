@@ -1,0 +1,29 @@
+[Unit]
+Description=Rust Video Stream Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust paths to match your deployment
+WorkingDirectory=/opt/rust_proxy
+ExecStart=/opt/rust_proxy/rust_proxy
+Restart=on-failure
+RestartSec=2
+
+# Optional
+Environment=LISTEN_ADDR=0.0.0.0:8080
+
+# Notes:
+# - This service is a dynamic upstream proxy: clients pass the upstream via ?url=...
+# - If you run behind Nginx/Caddy on HTTPS, forward X-Forwarded-Proto/Host to get correct m3u8 rewrite URLs.
+
+# Hardening (keep minimal; tune if needed)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rust_proxy
+
+[Install]
+WantedBy=multi-user.target

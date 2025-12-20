@@ -1,0 +1,16 @@
+[package]
+name = "rust_proxy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+axum = "0.6"
+hyper = { version = "0.14", features = ["client", "http1", "http2"] }
+hyper-rustls = { version = "0.23", features = ["http2"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+urlencoding = "2"
