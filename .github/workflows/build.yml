@@ -1,0 +1,345 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master, main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号 (如: v1.2.3，留空则自动生成)"
+        required: false
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # 测试阶段
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+  # 编译 Linux x86_64
+  build-linux-amd64:
+    name: Build Linux AMD64
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Prepare package
+        run: |
+          mkdir -p package/rust_proxy-linux-amd64
+          cp target/release/rust_proxy package/rust_proxy-linux-amd64/
+          cp install.sh package/rust_proxy-linux-amd64/ 2>/dev/null || true
+          cp README.md package/rust_proxy-linux-amd64/ 2>/dev/null || true
+          cp DEPLOY.md package/rust_proxy-linux-amd64/ 2>/dev/null || true
+          cd package && tar -czf rust_proxy-linux-amd64.tar.gz rust_proxy-linux-amd64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-linux-amd64
+          path: package/rust_proxy-linux-amd64.tar.gz
+          retention-days: 30
+
+  # 编译 Linux ARM64
+  build-linux-arm64:
+    name: Build Linux ARM64
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cargo for cross compilation
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml <<EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      - name: Build release for ARM64
+        run: cargo build --release --target aarch64-unknown-linux-gnu --verbose
+
+      - name: Prepare package
+        run: |
+          mkdir -p package/rust_proxy-linux-arm64
+          cp target/aarch64-unknown-linux-gnu/release/rust_proxy package/rust_proxy-linux-arm64/
+          cp install.sh package/rust_proxy-linux-arm64/ 2>/dev/null || true
+          cp README.md package/rust_proxy-linux-arm64/ 2>/dev/null || true
+          cp DEPLOY.md package/rust_proxy-linux-arm64/ 2>/dev/null || true
+          cd package && tar -czf rust_proxy-linux-arm64.tar.gz rust_proxy-linux-arm64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-linux-arm64
+          path: package/rust_proxy-linux-arm64.tar.gz
+          retention-days: 30
+
+  # 编译 macOS x86_64
+  build-macos-amd64:
+    name: Build macOS AMD64
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Prepare package
+        run: |
+          mkdir -p package/rust_proxy-macos-amd64
+          cp target/release/rust_proxy package/rust_proxy-macos-amd64/
+          cp install.sh package/rust_proxy-macos-amd64/ 2>/dev/null || true
+          cp README.md package/rust_proxy-macos-amd64/ 2>/dev/null || true
+          cp DEPLOY.md package/rust_proxy-macos-amd64/ 2>/dev/null || true
+          cd package && tar -czf rust_proxy-macos-amd64.tar.gz rust_proxy-macos-amd64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-macos-amd64
+          path: package/rust_proxy-macos-amd64.tar.gz
+          retention-days: 30
+
+  # 编译 macOS ARM64 (M1/M2)
+  build-macos-arm64:
+    name: Build macOS ARM64
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Build release for ARM64
+        run: cargo build --release --target aarch64-apple-darwin --verbose
+
+      - name: Prepare package
+        run: |
+          mkdir -p package/rust_proxy-macos-arm64
+          cp target/aarch64-apple-darwin/release/rust_proxy package/rust_proxy-macos-arm64/
+          cp install.sh package/rust_proxy-macos-arm64/ 2>/dev/null || true
+          cp README.md package/rust_proxy-macos-arm64/ 2>/dev/null || true
+          cp DEPLOY.md package/rust_proxy-macos-arm64/ 2>/dev/null || true
+          cd package && tar -czf rust_proxy-macos-arm64.tar.gz rust_proxy-macos-arm64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-macos-arm64
+          path: package/rust_proxy-macos-arm64.tar.gz
+          retention-days: 30
+
+  # 编译 Windows x86_64
+  build-windows-amd64:
+    name: Build Windows AMD64
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package/rust_proxy-windows-amd64
+          Copy-Item target/release/rust_proxy.exe package/rust_proxy-windows-amd64/
+          Copy-Item install.sh package/rust_proxy-windows-amd64/ -ErrorAction SilentlyContinue
+          Copy-Item README.md package/rust_proxy-windows-amd64/ -ErrorAction SilentlyContinue
+          Copy-Item DEPLOY.md package/rust_proxy-windows-amd64/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path package/rust_proxy-windows-amd64 -DestinationPath package/rust_proxy-windows-amd64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust_proxy-windows-amd64
+          path: package/rust_proxy-windows-amd64.zip
+          retention-days: 30
+
+  # 创建 Release
+  release:
+    name: Create Release
+    needs:
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-macos-amd64
+      - build-macos-arm64
+      - build-windows-amd64
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        run: |
+          echo "## 更新内容" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          git log --oneline -10 >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## 下载说明" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Linux (x86_64) - 推荐用于 Ubuntu 服务器" >> RELEASE_NOTES.md
+          echo "\`rust_proxy-linux-amd64.tar.gz\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Linux (ARM64) - 用于 ARM 服务器" >> RELEASE_NOTES.md
+          echo "\`rust_proxy-linux-arm64.tar.gz\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### macOS (Intel)" >> RELEASE_NOTES.md
+          echo "\`rust_proxy-macos-amd64.tar.gz\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### macOS (Apple Silicon M1/M2)" >> RELEASE_NOTES.md
+          echo "\`rust_proxy-macos-arm64.tar.gz\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Windows" >> RELEASE_NOTES.md
+          echo "\`rust_proxy-windows-amd64.zip\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## 快速使用" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo '```bash' >> RELEASE_NOTES.md
+          echo '# 下载 Linux x86_64 版本' >> RELEASE_NOTES.md
+          echo 'wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rust_proxy-linux-amd64.tar.gz' >> RELEASE_NOTES.md
+          echo '' >> RELEASE_NOTES.md
+          echo '# 解压' >> RELEASE_NOTES.md
+          echo 'tar -xzf rust_proxy-linux-amd64.tar.gz' >> RELEASE_NOTES.md
+          echo '' >> RELEASE_NOTES.md
+          echo '# 运行' >> RELEASE_NOTES.md
+          echo 'cd rust_proxy-linux-amd64 && ./rust_proxy' >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+
+      - name: Generate version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="v$(date +%Y%m%d)-${{ github.run_number }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            artifacts/rust_proxy-linux-amd64/rust_proxy-linux-amd64.tar.gz
+            artifacts/rust_proxy-linux-arm64/rust_proxy-linux-arm64.tar.gz
+            artifacts/rust_proxy-macos-amd64/rust_proxy-macos-amd64.tar.gz
+            artifacts/rust_proxy-macos-arm64/rust_proxy-macos-arm64.tar.gz
+            artifacts/rust_proxy-windows-amd64/rust_proxy-windows-amd64.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 检查编译状态
+  check:
+    name: Check Build Status
+    needs:
+      - test
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-macos-amd64
+      - build-macos-arm64
+      - build-windows-amd64
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "## 编译状态报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 任务 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux AMD64 | ${{ needs.build-linux-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux ARM64 | ${{ needs.build-linux-arm64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS AMD64 | ${{ needs.build-macos-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS ARM64 | ${{ needs.build-macos-arm64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows AMD64 | ${{ needs.build-windows-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ 测试失败" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ 所有编译任务完成！" >> $GITHUB_STEP_SUMMARY
