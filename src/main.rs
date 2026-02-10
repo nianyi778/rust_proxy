@@ -302,6 +302,12 @@ fn add_stream_cors_headers(headers: &mut HeaderMap) {
         hyper::header::HeaderValue::from_static("GET, HEAD, OPTIONS"),
     );
     headers.insert(
+        "access-control-allow-headers",
+        hyper::header::HeaderValue::from_static(
+            "Range, Accept-Encoding, Origin, Content-Type, Accept",
+        ),
+    );
+    headers.insert(
         "access-control-expose-headers",
         hyper::header::HeaderValue::from_static(
             "Content-Length, Content-Range, Content-Type, Accept-Ranges",
