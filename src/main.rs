@@ -74,6 +74,7 @@ async fn health() -> impl IntoResponse {
 #[derive(Debug, Deserialize)]
 struct StreamQuery {
     url: String,
+    referer: Option<String>, // 自定义 referer，优先使用
 }
 
 async fn stream(
@@ -128,13 +129,34 @@ async fn stream(
         ),
     );
 
+    // 使用自定义 referer（从 query 参数）或从 target URL 自动提取
+    let referer_value = q.referer.as_deref().map(|r| {
+        if r.ends_with('/') {
+            r.to_string()
+        } else {
+            format!("{}/", r)
+        }
+    });
+
+    // 如果没有自定义 referer，尝试从 target URL 提取
+    let referer_value = referer_value.or_else(|| {
+        let origin = target.origin().ascii_serialization();
+        if !origin.is_empty() {
+            Some(format!("{}/", origin))
+        } else {
+            None
+        }
+    });
+
+    if let Some(referer) = referer_value {
+        if let Ok(referer_header) = referer.parse::<HeaderValue>() {
+            headers.insert(hyper::header::REFERER, referer_header);
+            debug!(referer = %referer, "using referer");
+        }
+    }
+
     if let Ok(origin) = target.origin().ascii_serialization().parse::<HeaderValue>() {
         headers.insert(hyper::header::ORIGIN, origin);
-    }
-    if let Ok(referer) =
-        format!("{}/", target.origin().ascii_serialization()).parse::<HeaderValue>()
-    {
-        headers.insert(hyper::header::REFERER, referer);
     }
 
     if let Some(range) = range_header.as_deref() {
