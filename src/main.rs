@@ -217,11 +217,11 @@ async fn stream(
         let max_ad_secs = ad_filter_max_secs();
         let rewritten = rewrite_m3u8(&text, &q.url, &proxy_origin, proxy_path, max_ad_secs)
             .map_err(|e| {
-            (
-                StatusCode::BAD_GATEWAY,
-                format!("failed to rewrite m3u8: {e}"),
-            )
-        })?;
+                (
+                    StatusCode::BAD_GATEWAY,
+                    format!("failed to rewrite m3u8: {e}"),
+                )
+            })?;
 
         let mut resp = Response::builder()
             .status(StatusCode::OK)
@@ -491,15 +491,10 @@ fn strip_ad_runs(content: &str, max_break_secs: f64) -> String {
         // *all* content into uniform ~20s parts (every block is small, so no
         // block stands out) and avoids the false positives that a duration-only
         // or signature-repeat heuristic produces on such streams.
-        let anomaly_pod = !has_off_path
-            && short
-            && i > 0
-            && i < last
-            && run.seg_count <= 15
-            && {
-                let floor = 25.max(run.seg_count.saturating_mul(4));
-                runs[i - 1].seg_count >= floor && runs[i + 1].seg_count >= floor
-            };
+        let anomaly_pod = !has_off_path && short && i > 0 && i < last && run.seg_count <= 15 && {
+            let floor = 25.max(run.seg_count.saturating_mul(4));
+            runs[i - 1].seg_count >= floor && runs[i + 1].seg_count >= floor
+        };
         let is_ad = run.seg_count > 0 && (off_path || anomaly_pod);
 
         if is_ad {
@@ -780,7 +775,9 @@ https://cdn.test/V1/hls/c6.ts
             assert!(!out.contains(ad), "ad `{ad}` should be removed:\n{out}");
         }
         // Every content segment survives — including the 1-segment chunk c3.
-        for c in ["c0.ts", "c1.ts", "c2.ts", "c3.ts", "c4.ts", "c5.ts", "c6.ts"] {
+        for c in [
+            "c0.ts", "c1.ts", "c2.ts", "c3.ts", "c4.ts", "c5.ts", "c6.ts",
+        ] {
             assert!(out.contains(c), "content `{c}` missing:\n{out}");
         }
         // The terminator lived inside the trailing ad pod; it must be preserved.
@@ -809,7 +806,10 @@ https://cdn.test/V1/hls/c6.ts
         for blk in 0..25 {
             for seg in 0..5 {
                 let name = format!("seg_{blk}_{seg}.ts");
-                assert!(out.contains(&name), "content `{name}` wrongly removed:\n{out}");
+                assert!(
+                    out.contains(&name),
+                    "content `{name}` wrongly removed:\n{out}"
+                );
             }
         }
     }
@@ -885,7 +885,10 @@ https://cdn.test/V1/hls/c6.ts
         let before = input.matches(".ts").count();
         let out = strip_ad_runs(&strip_cue_breaks(&input), 30.0);
         let after = out.matches(".ts").count();
-        assert_eq!(after, before, "content wrongly removed: {before} -> {after}\n{out}");
+        assert_eq!(
+            after, before,
+            "content wrongly removed: {before} -> {after}\n{out}"
+        );
     }
 
     // super.ffzy 形态：单次插入的同路径广告(不重复)，但短块夹在两个远大于它的
@@ -913,7 +916,10 @@ https://cdn.test/V1/hls/c6.ts
 
         let out = strip_ad_runs(&strip_cue_breaks(&input), 30.0);
         for i in 0..5 {
-            assert!(!out.contains(&format!("adx{i}.ts")), "single ad pod should be removed:\n{out}");
+            assert!(
+                !out.contains(&format!("adx{i}.ts")),
+                "single ad pod should be removed:\n{out}"
+            );
         }
         assert!(out.contains("head0.ts") && out.contains("tail0.ts"));
     }
@@ -938,7 +944,10 @@ https://cdn.test/V1/hls/c6.ts
 
         let out = strip_ad_runs(&strip_cue_breaks(&input), 30.0);
         for i in 0..8 {
-            assert!(out.contains(&format!("mid{i}.ts")), "mid{i} wrongly removed:\n{out}");
+            assert!(
+                out.contains(&format!("mid{i}.ts")),
+                "mid{i} wrongly removed:\n{out}"
+            );
         }
     }
 
