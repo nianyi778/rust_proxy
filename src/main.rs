@@ -10,6 +10,8 @@ use axum::{
     Router,
 };
 use hyper::client::HttpConnector;
+mod destination;
+use destination::{validate_target, PublicResolver};
 use hyper::header::HeaderValue;
 use hyper_rustls::HttpsConnectorBuilder;
 use serde::Deserialize;
@@ -18,7 +20,7 @@ use url::Url;
 
 #[derive(Clone)]
 struct AppState {
-    client: hyper::Client<hyper_rustls::HttpsConnector<HttpConnector>, Body>,
+    client: hyper::Client<hyper_rustls::HttpsConnector<HttpConnector<PublicResolver>>, Body>,
 }
 
 #[tokio::main]
@@ -29,12 +31,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let listen_addr = std::env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into());
+    let listen_addr = std::env::var("LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".into());
     let listen_addr: SocketAddr = listen_addr
         .parse()
         .context("LISTEN_ADDR must be in the form host:port")?;
 
-    let mut http = HttpConnector::new();
+    let mut http = HttpConnector::new_with_resolver(PublicResolver);
     http.enforce_http(false);
     http.set_connect_timeout(Some(Duration::from_secs(10)));
 
@@ -107,6 +109,9 @@ async fn stream(
     if target.host_str().is_none() {
         return Err((StatusCode::BAD_REQUEST, "Invalid URL".into()));
     }
+
+    validate_target(&target)
+        .map_err(|_| (StatusCode::FORBIDDEN, "destination is not permitted".into()))?;
 
     let proxy_origin = request_origin(&req);
     let self_path = req.uri().path().to_string();

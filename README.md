@@ -184,3 +184,17 @@ location /stream {
 如果你要对外发布（掘金长文 / 推特线程 / 个人博客版），已整理好可复制的 Markdown：
 
 - [docs/press/README.md](docs/press/README.md)
+
+## 2026-11 SSRF hardening
+
+The listener defaults to `127.0.0.1:8080`; expose it through a reverse proxy.
+Only HTTP(S) public unicast destinations are accepted. URL credentials, private,
+loopback, link-local, shared and special-purpose address ranges are rejected.
+DNS validation is performed by the connection resolver and the exact validated
+addresses are used for connection, preventing a separate DNS validation/connect
+race. A DNS answer containing any prohibited address is rejected. Redirects are
+not followed. HLS segment and key URLs pass through the same request policy.
+
+Deploy under a dedicated unprivileged service account with outbound firewall
+rules as defense in depth. StarFlix's production definitions are maintained in
+`StarFlix/infra/security` and `StarFlix/infra/ansible/tasks/proxy-security.yml`.

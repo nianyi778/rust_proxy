@@ -657,6 +657,7 @@ dependencies = [
  "hyper-rustls",
  "serde",
  "tokio",
+ "tower-service",
  "tracing",
  "tracing-subscriber",
  "url",
